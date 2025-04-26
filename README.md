@@ -1,4 +1,4 @@
-																[ORIGEN](http://www.origencorp.net/) 
+[ORIGEN](http://www.origencorp.net/) 
 																	JAVA Nasa Technical Test ✍
 										
 Este test es para poder aplicar a la posición de JAVA Developer. Una vez accedas a este repositorio, sigue los siguientes pasos e indicaciones, por favor leer detalladamente.  
@@ -207,7 +207,11 @@ También esperamos que su código sea un reflejo de usted mismo en el trabajo, p
 Una vez que complete la prueba, envíe todo el proyecto a **su propio repositorio y hágalo público** y envíenos su enlace de repositorio a sramos@origencorp.net o hello@origencorp.net antes de la hora y la fecha límite para que podamos clonar su proyecto. Más tarde programaremos el día y la hora para realizar la entrevista técnica.
 
 
-## ¡Ahora estás listo, Happy Coding! 👊😎
+## ¡Ahora estás listo, Happy Coding! 👊😎
 
+## API Endpoint
 
-									
+La API para obtener las imágenes de la NASA está disponible en el siguiente endpoint:
+- GET: http://localhost:8080/api/nasa/images
+
+Este endpoint devuelve un listado de todas las imágenes recuperadas de la API de la NASA, ordenadas de manera descendente por ID.
