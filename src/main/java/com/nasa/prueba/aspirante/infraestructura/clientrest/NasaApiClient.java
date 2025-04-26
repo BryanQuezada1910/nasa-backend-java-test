@@ -11,6 +11,14 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
+import java.time.Duration;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 
 @Service
 public class NasaApiClient {
@@ -24,6 +32,14 @@ public class NasaApiClient {
     private String searchParam;
 
     private final RestTemplate restTemplate;
+    
+    // Simple cache to avoid unnecessary calls to the external API
+    // The key is the URL and the value is the response
+    private final Map<String, NasaApiResponse> responseCache = new HashMap<>();
+    
+    // Cache time-to-live in milliseconds (5 minutes)
+    private static final long CACHE_TTL = 300000;
+    private Map<String, Long> cacheTimestamps = new HashMap<>();
 
     public NasaApiClient() {
         this.restTemplate = new RestTemplate();
@@ -31,34 +47,61 @@ public class NasaApiClient {
 
     public NasaApiResponse fetchNasaImages() {
         String url = buildApiUrl();
+        
+        // Check if response is in cache and valid
+        if (responseCache.containsKey(url)) {
+            long timestamp = cacheTimestamps.getOrDefault(url, 0L);
+            if (System.currentTimeMillis() - timestamp < CACHE_TTL) {
+                logger.debug("Returning cached response for URL: {}", url);
+                return responseCache.get(url);
+            }
+        }
+        
         try {
-            logger.info("Realizando petición GET a: {}", url);
+            logger.info("Making GET request to: {}", url);
             
-            // Usar ResponseEntity para obtener más información sobre la respuesta
-            ResponseEntity<String> responseEntity = restTemplate.getForEntity(url, String.class);
+            // Configure headers
+            HttpHeaders headers = new HttpHeaders();
+            headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+            HttpEntity<?> entity = new HttpEntity<>(headers);
             
-            logger.debug("Respuesta status code: {}", responseEntity.getStatusCodeValue());
-            logger.debug("Respuesta headers: {}", responseEntity.getHeaders());
+            // Make a single API call and convert the result
+            ResponseEntity<NasaApiResponse> responseEntity = 
+                restTemplate.exchange(url, HttpMethod.GET, entity, NasaApiResponse.class);
             
             if (responseEntity.getStatusCode().is2xxSuccessful() && responseEntity.getBody() != null) {
-                // Si la respuesta es exitosa, convertir el cuerpo a NasaApiResponse
-                return restTemplate.getForObject(url, NasaApiResponse.class);
+                logger.debug("Response status code: {}", responseEntity.getStatusCodeValue());
+                logger.debug("Response headers: {}", responseEntity.getHeaders());
+                
+                // Save response in cache
+                NasaApiResponse response = responseEntity.getBody();
+                responseCache.put(url, response);
+                cacheTimestamps.put(url, System.currentTimeMillis());
+                
+                return response;
             } else {
-                logger.error("Error en la respuesta API: Status={}, Body={}", 
-                    responseEntity.getStatusCodeValue(), responseEntity.getBody());
+                logger.error("Error in API response: Status={}", 
+                    responseEntity.getStatusCodeValue());
                 return null;
             }
         } catch (RestClientException e) {
-            logger.error("Error al realizar la petición a la API de NASA: {}", e.getMessage(), e);
+            logger.error("Error making request to NASA API: {}", e.getMessage(), e);
             return null;
         }
     }
     
     public String buildApiUrl() {
-        // Usar encodedValue=false para evitar el doble encoding
+        // Use encodedValue=false to avoid double encoding
         return UriComponentsBuilder.fromHttpUrl(nasaApiUrl)
                 .queryParam("q", searchParam)
                 .build(false)
                 .toUriString();
+    }
+    
+    // Method to manually clear cache if needed
+    public void clearCache() {
+        responseCache.clear();
+        cacheTimestamps.clear();
+        logger.debug("Cache cleared");
     }
 }
